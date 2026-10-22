@@ -630,6 +630,19 @@ const DiskAttachment = {
 
 //
 //
+/*
+ * Managed block storage (MBS) domains are returned by the engine without a `type`, but they
+ * are data domains and are usable for disks the same as any other data domain.
+ */
+function storageDomainType (storageDomain: Object): string {
+  if (!storageDomain.type && storageDomain?.storage?.type === 'managed_block_storage') {
+    return 'data'
+  }
+  return storageDomain.type
+}
+
+//
+//
 const DataCenter = {
   toInternal ({ dataCenter }: { dataCenter: ApiDataCenterType }): DataCenterType {
     const permissions = Permissions.toInternal({ permissions: dataCenter?.permissions?.permission })
@@ -640,7 +653,7 @@ const DataCenter = {
           id: storageDomain.id,
           name: storageDomain.name,
           status: storageDomain.status,
-          type: storageDomain.type,
+          type: storageDomainType(storageDomain),
         }
         return acc
       }, {})
@@ -741,12 +754,21 @@ const StorageDomain = {
         break
 
       case 'cinder':
-      case 'managed_block_storage':
         storageSubType = 'openstack'
         diskTypeToDiskAttributes.thin.format = undefined
         diskTypeToDiskAttributes.pre.format = 'raw'
         templateDiskFormatToSparse = createAsMapping({
           cow: true,
+          raw: false,
+        })
+        break
+
+      case 'managed_block_storage':
+        storageSubType = 'openstack'
+        diskTypeToDiskAttributes.thin.format = 'raw'
+        diskTypeToDiskAttributes.pre.format = 'raw'
+        templateDiskFormatToSparse = createAsMapping({
+          cow: false,
           raw: false,
         })
         break
@@ -774,7 +796,7 @@ const StorageDomain = {
     return {
       id: storageDomain.id,
       name: storageDomain.name,
-      type: storageDomain.type,
+      type: storageDomainType(storageDomain),
       storageType,
       storageSubType,
       diskTypeToDiskAttributes,
